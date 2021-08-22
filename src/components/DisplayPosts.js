@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import { API, graphqlOperation } from 'aws-amplify';
 
 import { listPosts } from '../graphql/queries';
+import { onCreatePost } from '../graphql/subscriptions';
+
 import DeletePost from './DeletePost';
 import EditPost from './EditPost';
 
@@ -34,8 +36,44 @@ const DisplayPosts = () => {
 
     getPosts();
 
-    return () => (isMounted = false);
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  // Adding onCreate Subscription and Refreshing UI with new Posts Automatically
+  useEffect(() => {
+    let isMounted = true;
+
+    // creating post listener which is a subscription to update the display list after creating post
+    const createPostListener = API.graphql(graphqlOperation(onCreatePost))
+      // Attaching 'subscribe' method to get an Object which returns a Promise with 'next'
+      .subscribe({
+        // postData is indeed an Object that we need
+        next: postData => {
+          // to fetch new post with subscription
+          const newPost = postData.value.data.onCreatePost;
+
+          // using 'filter' in our component state - const [posts, setPosts] = useState([]);
+          // to make sure we only get OLD previous posts only
+          const prevPosts = posts.filter(post => post.id !== newPost.id);
+
+          // adding new post to previous posts & creating a new array
+          // we want to see newPost first - [newPost, ...prevPosts], order can be change
+          const updatedPosts = [newPost, ...prevPosts];
+
+          if (isMounted) {
+            // set our component state to updated/new post lists
+            setPosts(updatedPosts);
+          }
+        },
+      });
+
+    return () => {
+      createPostListener.unsubscribe();
+      isMounted = false;
+    };
+  }, [posts]);
 
   if (error) return <div>{error}</div>;
 
