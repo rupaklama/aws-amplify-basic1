@@ -49,12 +49,16 @@ const CreatePost = () => {
       );
     } catch (err) {
       setError('Sorry, something went wrong. Try again');
+      console.error('creating post', err);
     }
 
     setFormData({ postTitle: '', postBody: '' });
   };
 
-  if (error) return <div>{error}</div>;
+  if (error) {
+    window.location.reload();
+    return <div>{error}</div>;
+  }
 
   return (
     <form className='add-post' onSubmit={handleSubmit}>

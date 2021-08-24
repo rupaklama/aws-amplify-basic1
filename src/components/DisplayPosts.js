@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 // API  - to query/fetch actual api from backend
 // graphqlOperation - is one of the graphql query operation (mutations, queries or subscriptions)
 import { API, graphqlOperation } from 'aws-amplify';
 
 import { listPosts } from '../graphql/queries';
-import { onCreatePost } from '../graphql/subscriptions';
+import { onCreatePost, onDeletePost } from '../graphql/subscriptions';
 
 import DeletePost from './DeletePost';
 import EditPost from './EditPost';
@@ -13,6 +13,9 @@ import EditPost from './EditPost';
 const DisplayPosts = () => {
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState('');
+
+  const subscriptionCreatePostRef = useRef();
+  const subscriptionDeletePostRef = useRef();
 
   console.log(posts);
 
@@ -29,7 +32,8 @@ const DisplayPosts = () => {
         }
       } catch (err) {
         if (isMounted) {
-          setError('Sorry, something went wrong. Try again later');
+          setError('Sorry, something went wrong. Try again');
+          console.error('fetching posts', err);
         }
       }
     };
@@ -41,36 +45,53 @@ const DisplayPosts = () => {
     };
   }, []);
 
-  // Adding onCreate Subscription and Refreshing UI with new Posts Automatically
+  // Adding Subscriptions and Refreshing UI with new Posts Automatically
   useEffect(() => {
     let isMounted = true;
 
-    // creating post listener which is a subscription to update the display list after creating post
-    const createPostListener = API.graphql(graphqlOperation(onCreatePost))
-      // Attaching 'subscribe' method to get an Object which returns a Promise with 'next'
-      .subscribe({
-        // postData is indeed an Object that we need
+    try {
+      // creating post listener which is a subscription to update the display list after creating post
+      subscriptionCreatePostRef.current = API.graphql(graphqlOperation(onCreatePost))
+        // Attaching 'subscribe' method to get an Object which returns a Promise with 'next'
+        .subscribe({
+          // postData is indeed an Object that we need
+          next: postData => {
+            // to fetch new post with subscription
+            const newPost = postData.value.data.onCreatePost;
+
+            // using 'filter' in our component state - const [posts, setPosts] = useState([]);
+            // to make sure we only get OLD previous posts only
+            const prevPosts = posts.filter(post => post.id !== newPost.id);
+
+            // adding new post to previous posts & creating a new array
+            // we want to see newPost first - [newPost, ...prevPosts], order can be change
+            const updatedPosts = [newPost, ...prevPosts];
+
+            if (isMounted) {
+              // set our component state to updated/new post lists
+              setPosts(updatedPosts);
+            }
+          },
+        });
+
+      subscriptionDeletePostRef.current = API.graphql(graphqlOperation(onDeletePost)).subscribe({
         next: postData => {
-          // to fetch new post with subscription
-          const newPost = postData.value.data.onCreatePost;
-
-          // using 'filter' in our component state - const [posts, setPosts] = useState([]);
-          // to make sure we only get OLD previous posts only
-          const prevPosts = posts.filter(post => post.id !== newPost.id);
-
-          // adding new post to previous posts & creating a new array
-          // we want to see newPost first - [newPost, ...prevPosts], order can be change
-          const updatedPosts = [newPost, ...prevPosts];
-
+          const deletedPost = postData.value.data.onDeletePost;
+          const updatedPosts = posts.filter(post => post.id !== deletedPost.id);
           if (isMounted) {
-            // set our component state to updated/new post lists
             setPosts(updatedPosts);
           }
         },
       });
-
+    } catch (err) {
+      if (isMounted) {
+        setError('Sorry, something went wrong. Try again');
+        console.error('posts subscription', err);
+      }
+    }
     return () => {
-      createPostListener.unsubscribe();
+      subscriptionCreatePostRef.current.unsubscribe();
+      subscriptionDeletePostRef.current.unsubscribe();
       isMounted = false;
     };
   }, [posts]);
@@ -93,8 +114,8 @@ const DisplayPosts = () => {
 
           <br />
           <span>
-            <DeletePost />
-            <EditPost />
+            <DeletePost postId={post.id} />
+            <EditPost postId={post.id} />
           </span>
         </div>
       ))}
