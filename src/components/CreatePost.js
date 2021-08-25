@@ -18,20 +18,32 @@ const CreatePost = () => {
   const { postOwnerId, postOwnerUsername, postTitle, postBody, createdAt } = formData;
 
   useEffect(() => {
-    const user = async () => {
-      // accessing auth user with Auth module
-      await Auth.currentUserInfo().then(user => {
-        // console.log('user name', user.username);
-        // console.log('user sub/id', user.attributes.sub);
-        setFormData({
-          ...formData,
-          postOwnerId: user.attributes.sub,
-          postOwnerUsername: user.username,
-        });
-      });
-    };
+    let isMounted = true;
 
-    user();
+    try {
+      if (isMounted) {
+        const user = async () => {
+          // accessing auth user with Auth module
+          await Auth.currentUserInfo().then(user => {
+            // console.log('user name', user.username);
+            // console.log('user sub/id', user.attributes.sub);
+            setFormData({
+              ...formData,
+              postOwnerId: user.attributes.sub,
+              postOwnerUsername: user.username,
+            });
+          });
+        };
+
+        user();
+      }
+    } catch (err) {
+      if (isMounted) {
+        console.error('auth user search', err);
+        setError('Sorry something went wrong. Try again');
+      }
+    }
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
