@@ -1,5 +1,16 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Amplify
+amplify/backend/auth
+amplify/backend/backend-config.json
+amplify/backend/tags.json
+amplify/team-provider-info.json
+
+src/aws-exports.js
+.graphqlconfig.yml
+.amplifyrc
+
+
 # dependencies
 /node_modules
 /.pnp
